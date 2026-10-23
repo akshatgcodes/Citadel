@@ -1,0 +1,14 @@
+# Optional per-file metadata overrides, keyed by filename in data/raw/.
+# Anything left out is detected automatically (title from PDF metadata / HTML <title> /
+# filename; date and regulation from the filename and first page).
+# Titles appear in every citation, so keep them short and recognisable.
+
+"21MEO105T - Syllabus  2026-27.pdf":
+  title: "21MEO105T Syllabus (2026-27)"
+
+"csc-r2021-curriculum-and-syllabus.pdf":
+  title: "B.Tech CSE Curriculum and Syllabus R2021"
+  regulation: R2021
+
+"Code of Conduct for Students _ Policies - SRMIST.html":
+  title: "Code of Conduct for Students"
