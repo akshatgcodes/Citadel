@@ -1,0 +1,50 @@
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  AKSHAT'S SETUP TOOLKIT · akshatgcodes.in                            ║
+# ║  Dependabot config. Goes to: <repo>/.github/dependabot.yml           ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+#
+# What this does, every week (Monday 06:00 IST):
+#   1. Dependabot checks every dependency and opens update PRs.
+#      Minor + patch updates are grouped into ONE PR per ecosystem;
+#      major updates get their own PR each.
+#   2. CI (ci.yml) runs on each PR.
+#   3. dependabot-auto-merge.yml merges the PR automatically once CI is green
+#      (majors too, unless you turn that off there).
+#   4. maintenance-report.yml emails you a summary on Monday 10:00 IST.
+#
+# How to fill: keep `github-actions`, and UNCOMMENT the blocks for the
+# ecosystems this repo uses. Set `directory` to where the manifest lives
+# (e.g. "/frontend"). Copy a block for each extra folder.
+#
+# Want monthly instead of weekly? Change every `interval: "weekly"` to
+# "monthly" (and the cron in maintenance-report.yml to "30 4 1 * *").
+
+version: 2
+
+updates:
+  # GitHub Actions used in .github/workflows (keep this one)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
+    commit-message: { prefix: "👷" }
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Python: pyproject.toml + uv.lock in /
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule: { interval: "weekly", day: "monday", time: "06:00", timezone: "Asia/Kolkata" }
+    open-pull-requests-limit: 10
+    commit-message: { prefix: "👆" }
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+# ──────────────────────────────────────────────────────────────────────────
+#  Akshat Gupta
+#  Website   https://akshatgcodes.in
+#  LinkedIn  https://linkedin.com/in/akshatgcodes
+#  GitHub    https://github.com/akshatgcodes
+#  Email     akshatgcodes@gmail.com
+# ──────────────────────────────────────────────────────────────────────────

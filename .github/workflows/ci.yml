@@ -1,0 +1,147 @@
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  AKSHAT'S SETUP TOOLKIT · akshatgcodes.in                            ║
+# ║  CI workflow. Goes to: <repo>/.github/workflows/ci.yml               ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+#
+# Works as-is: it auto-detects the stack in each folder listed in CI_DIRS.
+#   Node / Bun   → installs with the right package manager (from the lockfile),
+#                  then runs the `lint`, `typecheck`, `build`, `test` scripts that exist
+#   Python       → installs from uv.lock / pyproject.toml / requirements.txt,
+#                  byte-compiles everything, runs ruff if configured, pytest if tests exist
+#
+# The only things you may need to edit:
+#   1. CI_DIRS:  space-separated folders to check, e.g. ". backend frontend"
+#   2. env:      dummy values for env vars your build reads at build time
+#
+# The job is named `ci`. dependabot-auto-merge.yml waits for it to pass
+# before merging dependency updates, so keep the name.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI_DIRS: "."
+  NODE_DEFAULT_VERSION: "22"
+  PYTHON_DEFAULT_VERSION: "3.12"
+  # Build-time env vars: add placeholders here if the build needs them, e.g.
+  # DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
+  # NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+  # SKIP_ENV_VALIDATION: "1"
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Detect stacks
+        id: detect
+        run: |
+          node=false; bun=false; pnpm=false; python=false
+          for d in $CI_DIRS; do
+            [ -f "$d/package.json" ] && node=true
+            { [ -f "$d/bun.lockb" ] || [ -f "$d/bun.lock" ]; } && bun=true
+            [ -f "$d/pnpm-lock.yaml" ] && pnpm=true
+            { [ -f "$d/pyproject.toml" ] || [ -f "$d/requirements.txt" ] || [ -f "$d/setup.py" ]; } && python=true
+          done
+          node_version="$NODE_DEFAULT_VERSION"
+          for f in .nvmrc .node-version; do [ -f "$f" ] && node_version="$(tr -d 'v \n' < "$f")"; done
+          python_version="$PYTHON_DEFAULT_VERSION"
+          [ -f .python-version ] && python_version="$(tr -d ' \n' < .python-version)"
+          {
+            echo "node=$node"; echo "bun=$bun"; echo "pnpm=$pnpm"; echo "python=$python"
+            echo "node_version=$node_version"; echo "python_version=$python_version"
+          } >> "$GITHUB_OUTPUT"
+          echo "Detected → node=$node bun=$bun pnpm=$pnpm python=$python"
+
+      - if: steps.detect.outputs.node == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ steps.detect.outputs.node_version }}
+
+      - if: steps.detect.outputs.bun == 'true'
+        uses: oven-sh/setup-bun@v2
+
+      - if: steps.detect.outputs.pnpm == 'true'
+        run: corepack enable
+
+      - if: steps.detect.outputs.python == 'true'
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ steps.detect.outputs.python_version }}
+
+      - name: Install, lint, typecheck, build, test
+        run: |
+          set -euo pipefail
+
+          has_script() {  # does package.json define a real (non-placeholder) script?
+            node -e '
+              const s = (require("./package.json").scripts || {})[process.argv[1]];
+              process.exit(s && !/no test specified/.test(s) ? 0 : 1);
+            ' "$1"
+          }
+
+          run_node() {
+            if   [ -f bun.lockb ] || [ -f bun.lock ]; then pm=bun;  bun install --frozen-lockfile
+            elif [ -f pnpm-lock.yaml ];               then pm=pnpm; pnpm install --frozen-lockfile
+            elif [ -f yarn.lock ];                    then pm=yarn; yarn install --frozen-lockfile
+            elif [ -f package-lock.json ];            then pm=npm;  npm ci
+            else                                           pm=npm;  npm install
+            fi
+            for s in lint typecheck type-check build test; do
+              if has_script "$s"; then
+                echo "::group::$pm run $s"; $pm run "$s"; echo "::endgroup::"
+              fi
+            done
+          }
+
+          run_python() {
+            PY=""
+            python -m pip install --upgrade pip
+            if   [ -f uv.lock ];           then pip install uv && uv sync --all-extras && PY="uv run"
+            elif [ -f pyproject.toml ];    then pip install -e ".[dev]" || pip install -e .
+            elif [ -f requirements.txt ];  then pip install -r requirements.txt
+            fi
+            if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+            echo "::group::compile check"
+            python -m compileall -q -x '(\.venv|venv|node_modules|\.git)/' .
+            echo "::endgroup::"
+            if [ -f ruff.toml ] || [ -f .ruff.toml ] || grep -qs '\[tool.ruff' pyproject.toml; then
+              echo "::group::ruff"; pip install ruff; ruff check .; echo "::endgroup::"
+            fi
+            if [ -d tests ] || ls test_*.py */test_*.py >/dev/null 2>&1; then
+              echo "::group::pytest"; pip install pytest; $PY python -m pytest -q; echo "::endgroup::"
+            fi
+          }
+
+          for d in $CI_DIRS; do
+            echo "━━━ $d ━━━"
+            ( cd "$d"
+              ran=false
+              if [ -f package.json ]; then run_node; ran=true; fi
+              if [ -f pyproject.toml ] || [ -f requirements.txt ] || [ -f setup.py ]; then run_python; ran=true; fi
+              if [ "$ran" = false ]; then echo "No Node or Python project found in '$d', skipping."; fi
+            )
+          done
+
+# ──────────────────────────────────────────────────────────────────────────
+#  Akshat Gupta
+#  Website   https://akshatgcodes.in
+#  LinkedIn  https://linkedin.com/in/akshatgcodes
+#  GitHub    https://github.com/akshatgcodes
+#  Email     akshatgcodes@gmail.com
+# ──────────────────────────────────────────────────────────────────────────
