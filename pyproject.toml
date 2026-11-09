@@ -5,14 +5,14 @@ description = "RAG over university academic documents, with an evaluation harnes
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = [
-    "pymupdf>=1.26",
+    "pymupdf>=2.1",
     "beautifulsoup4>=4.12",
     "sentence-transformers>=3.0",
     "rank-bm25>=0.2.2",
     "psycopg[binary]>=3.3.6",
     "pgvector>=0.3",
     "numpy>=1.26",
-    "pydantic>=2.14.2",
+    "pydantic>=2.14.3",
     "pydantic-settings>=2.16.2",
     "pyyaml>=6.0",
     "trafilatura>=2.0",
@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=9.2.0", "ruff>=0.17.3", "mypy>=2.4.1", "types-PyYAML"]
+dev = ["pytest>=9.2.0", "ruff>=0.17.4", "mypy>=2.4.1", "types-PyYAML"]
 
 [project.scripts]
 citadel = "citadel.cli:main"
